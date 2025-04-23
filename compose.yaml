@@ -14,6 +14,8 @@ services:
       target: final
     ports:
       - 8080:8080
+    environment:
+      - OTLP_ENDPOINT=http://sb-monitoring-stack-alloy.sb-monitoring-stack.svc.cluster.local:4317
 
 # The commented out section below is an example of how to define a PostgreSQL
 # database that your application can use. `depends_on` tells Docker Compose to

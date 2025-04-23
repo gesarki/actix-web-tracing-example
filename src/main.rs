@@ -4,6 +4,7 @@ use opentelemetry::global;
 use opentelemetry::sdk::propagation::TraceContextPropagator;
 use opentelemetry_otlp::WithExportConfig;
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::sync::Mutex;
 use tracing::{info, instrument};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -118,6 +119,14 @@ async fn create_user(user: web::Json<CreateUser>, data: web::Data<Mutex<AppState
     HttpResponse::Created().json(new_user)
 }
 
+// Get env var from environment variable or default
+fn get_env_or_default(env_var: &str, default: &str) -> String {
+    let result = env::var(env_var)
+        .unwrap_or_else(|_| default.to_string());
+    result
+}
+
+
 // Initialize OpenTelemetry with OTLP exporter
 fn init_telemetry() -> opentelemetry::sdk::trace::Tracer {
     global::set_text_map_propagator(TraceContextPropagator::new());
@@ -128,7 +137,9 @@ fn init_telemetry() -> opentelemetry::sdk::trace::Tracer {
         .with_exporter(
             opentelemetry_otlp::new_exporter()
                 .tonic() // Using gRPC protocol
-                .with_endpoint("http://localhost:4317")
+                .with_endpoint(
+                    get_env_or_default("OTLP_ENDPOINT","http://localhost:4317")
+                )
         )
         .with_trace_config(
             opentelemetry_sdk::trace::config()
@@ -158,7 +169,7 @@ async fn main() -> std::io::Result<()> {
         .init();
     
     info!("Tracing initialized");
-
+    info!("Sending traces to: {}", get_env_or_default("OTLP_ENDPOINT", "http://localhost:4317"));
 
     // Initialize application state with Mutex for thread safety
     let app_state = web::Data::new(Mutex::new(AppState {
@@ -190,7 +201,7 @@ async fn main() -> std::io::Result<()> {
     let server_handle = server.handle();
     ctrlc::set_handler(move || {
         info!("Shutting down server");
-        server_handle.stop(true);
+        server_handle.stop(true);;
         global::shutdown_tracer_provider();
     }).expect("Failed to set Ctrl-C handler");
     
